@@ -69,6 +69,7 @@ def main():
     init_db()
 
     while(1):
+        pihole.refresh()
         data = get_data_for_influxdb()
         if influxdb_client.write_points(data) == True:
             print("{} - Data written to DB successfully".format(datetime.datetime.now()))
