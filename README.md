@@ -4,4 +4,4 @@ Based slightly on my other project, [speedtest-to-influxdb](https://github.com/c
 This project is automatically built through GitHub actions and the DockerHub file can be found [here](https://hub.docker.com/r/chriscn/pihole-to-influxdb).
 
 ## Setup
-TODO Write
+TODO Write.
