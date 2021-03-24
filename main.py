@@ -30,6 +30,7 @@ def init_db():
         influxdb_client.switch_database(DB_DATABASE)
         print('{} - Switched to database {}'.format(datetime.datetime.now(), DB_DATABASE))
 
+
 def get_data_for_influxdb():
     influx_data = [
         {
@@ -58,6 +59,14 @@ def get_data_for_influxdb():
                 'total_clients': int(pihole.total_clients.replace(',','')),
                 'unique_clients': int(pihole.unique_clients.replace(',','')),
                 'total_queries': int(pihole.total_queries.replace(',',''))
+            }
+        },
+        {
+            'measurement': 'other',
+            'time': datetime.datetime.now(),
+            'fields': {
+                'status': True if pihole.status == 'enabled' else False,
+                'gravity_last_update': pihole.gravity_last_updated['absolute']
             }
         }
     ]
