@@ -77,6 +77,28 @@ def get_data_for_influxdb():
 
     return influx_data
 
+def get_formatted_authenticated_forward_destinations():
+    formatted_dict = {}
+    for key in pihole.forward_destinations['forwarded_destinations']:
+        formatted_dict[key.split('|')[0]] = pihole.forward_destinations['forwarded_destinations'][key]
+    
+    return formatted_dict
+
+def get_authenticated_data_for_influxdb():
+    influx_data = [
+        {
+            'measurement': 'authenticated_query_types',
+            'time': datetime.datetime.now(),
+            'fields': pihole.query_types
+        },
+        {
+            'measurement': 'authenticated_forward_destinations',
+            'time': datetime.datetime.now(),
+            'fields': get_formatted_authenticated_forward_destinations()
+        }
+    ]
+
+    return influx_data
 
 def main():
     init_db()
@@ -93,6 +115,14 @@ def main():
     while(1):
         pihole.refresh()
         data = get_data_for_influxdb()
+
+        if USE_AUTHENTICATION:
+            authenticated_data = get_authenticated_data_for_influxdb()
+            if influxdb_client.write_points(authenticated_data) == True:
+                print("{} - Authenticated data written to DB successfully".format(datetime.datetime.now()))
+            else:
+                print('{} - Failed to write authenticated points to the database'.format(datetime.datetime.now()))
+
         if influxdb_client.write_points(data) == True:
             print("{} - Data written to DB successfully".format(datetime.datetime.now()))
             print("{} - Now sleeping for {}s".format(datetime.datetime.now(), TEST_INTERVAL))
