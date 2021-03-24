@@ -16,7 +16,7 @@ DB_DATABASE = os.environ.get('INFLUX_DB_DATABASE')
 PIHOLE_HOSTNAME = os.environ.get('PIHOLE_HOSTNAME')
 TEST_INTERVAL = int(os.environ.get('PIHOLE_INTERVAL'))
 
-pihole = ph.PiHole('192.168.113.250')
+pihole = ph.PiHole(PIHOLE_HOSTNAME)
 influxdb_client = InfluxDBClient(DB_ADDRESS, DB_PORT, DB_USER, DB_PASSWORD, None)
 
 def init_db():
