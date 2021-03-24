@@ -16,6 +16,10 @@ DB_DATABASE = os.environ.get('INFLUX_DB_DATABASE')
 PIHOLE_HOSTNAME = os.environ.get('PIHOLE_HOSTNAME')
 TEST_INTERVAL = int(os.environ.get('PIHOLE_INTERVAL'))
 
+# Authentication
+AUTHENTICATION_TOKEN = os.environ.get('PIHOLE_AUTHENTICATION')
+USE_AUTHENTICATION = False if AUTHENTICATION_TOKEN == None else True
+
 pihole = ph.PiHole('192.168.113.250')
 influxdb_client = InfluxDBClient(DB_ADDRESS, DB_PORT, DB_USER, DB_PASSWORD, None)
 
@@ -76,6 +80,15 @@ def get_data_for_influxdb():
 
 def main():
     init_db()
+
+    if USE_AUTHENTICATION:
+        try:
+            pihole.authenticate(AUTHENTICATION_TOKEN)
+            pihole.refresh()
+        except:
+            print("{} - Authentication failed using token: {}, disabling authentication.".format(datetime.datetime.now(), AUTHENTICATION_TOKEN))
+            USE_AUTHENTICATION = False
+            raise
 
     while(1):
         pihole.refresh()
