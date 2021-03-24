@@ -16,6 +16,10 @@ DB_DATABASE = os.environ.get('INFLUX_DB_DATABASE')
 PIHOLE_HOSTNAME = os.environ.get('PIHOLE_HOSTNAME')
 TEST_INTERVAL = int(os.environ.get('PIHOLE_INTERVAL'))
 
+# Authentication
+AUTHENTICATION_TOKEN = os.environ.get('PIHOLE_AUTHENTICATION')
+USE_AUTHENTICATION = False if AUTHENTICATION_TOKEN == None else True
+
 pihole = ph.PiHole(PIHOLE_HOSTNAME)
 influxdb_client = InfluxDBClient(DB_ADDRESS, DB_PORT, DB_USER, DB_PASSWORD, None)
 
@@ -73,13 +77,52 @@ def get_data_for_influxdb():
 
     return influx_data
 
+def get_formatted_authenticated_forward_destinations():
+    formatted_dict = {}
+    for key in pihole.forward_destinations['forwarded_destinations']:
+        formatted_dict[key.split('|')[0]] = pihole.forward_destinations['forwarded_destinations'][key]
+    
+    return formatted_dict
+
+def get_authenticated_data_for_influxdb():
+    influx_data = [
+        {
+            'measurement': 'authenticated_query_types',
+            'time': datetime.datetime.now(),
+            'fields': pihole.query_types
+        },
+        {
+            'measurement': 'authenticated_forward_destinations',
+            'time': datetime.datetime.now(),
+            'fields': get_formatted_authenticated_forward_destinations()
+        }
+    ]
+
+    return influx_data
 
 def main():
     init_db()
 
+    if USE_AUTHENTICATION:
+        try:
+            pihole.authenticate(AUTHENTICATION_TOKEN)
+            pihole.refresh()
+        except:
+            print("{} - Authentication failed using token: {}, disabling authentication.".format(datetime.datetime.now(), AUTHENTICATION_TOKEN))
+            USE_AUTHENTICATION = False
+            raise
+
     while(1):
         pihole.refresh()
         data = get_data_for_influxdb()
+
+        if USE_AUTHENTICATION:
+            authenticated_data = get_authenticated_data_for_influxdb()
+            if influxdb_client.write_points(authenticated_data) == True:
+                print("{} - Authenticated data written to DB successfully".format(datetime.datetime.now()))
+            else:
+                print('{} - Failed to write authenticated points to the database'.format(datetime.datetime.now()))
+
         if influxdb_client.write_points(data) == True:
             print("{} - Data written to DB successfully".format(datetime.datetime.now()))
             print("{} - Now sleeping for {}s".format(datetime.datetime.now(), TEST_INTERVAL))
