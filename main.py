@@ -13,12 +13,11 @@ DB_PASSWORD = os.environ.get('INFLUX_DB_PASSWORD')
 DB_DATABASE = os.environ.get('INFLUX_DB_DATABASE')
 
 # PiHole Settings
-PIHOLE_HOSTNAME = os.environ.get('PIHOLE_HOSTNAME')
+PIHOLE_HOSTNAME = str(os.environ.get('PIHOLE_HOSTNAME'))
 TEST_INTERVAL = int(os.environ.get('PIHOLE_INTERVAL'))
 
 # Authentication
 AUTHENTICATION_TOKEN = os.environ.get('PIHOLE_AUTHENTICATION')
-USE_AUTHENTICATION = False if AUTHENTICATION_TOKEN == None else True
 
 pihole = ph.PiHole(PIHOLE_HOSTNAME)
 influxdb_client = InfluxDBClient(DB_ADDRESS, DB_PORT, DB_USER, DB_PASSWORD, None)
@@ -79,8 +78,8 @@ def get_data_for_influxdb():
 
 def get_formatted_authenticated_forward_destinations():
     formatted_dict = {}
-    for key in pihole.forward_destinations['forwarded_destinations']:
-        formatted_dict[key.split('|')[0]] = pihole.forward_destinations['forwarded_destinations'][key]
+    for key in pihole.forward_destinations['forward_destinations']:
+        formatted_dict[key.split('|')[0]] = pihole.forward_destinations['forward_destinations'][key]
     
     return formatted_dict
 
@@ -102,6 +101,8 @@ def get_authenticated_data_for_influxdb():
 
 def main():
     init_db()
+
+    USE_AUTHENTICATION = False if AUTHENTICATION_TOKEN == None else True
 
     if USE_AUTHENTICATION:
         try:
