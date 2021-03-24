@@ -20,7 +20,7 @@ TEST_INTERVAL = int(os.environ.get('PIHOLE_INTERVAL'))
 AUTHENTICATION_TOKEN = os.environ.get('PIHOLE_AUTHENTICATION')
 USE_AUTHENTICATION = False if AUTHENTICATION_TOKEN == None else True
 
-pihole = ph.PiHole('192.168.113.250')
+pihole = ph.PiHole(PIHOLE_HOSTNAME)
 influxdb_client = InfluxDBClient(DB_ADDRESS, DB_PORT, DB_USER, DB_PASSWORD, None)
 
 def init_db():
