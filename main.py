@@ -76,10 +76,17 @@ def get_data_for_influxdb():
 
     return influx_data
 
+def get_formatted_authenticated_query_types():
+    formatted_dict = {}
+    for key in pihole.query_types:
+        formatted_dict[key] = float(pihole.query_types[key])
+    
+    return formatted_dict
+
 def get_formatted_authenticated_forward_destinations():
     formatted_dict = {}
     for key in pihole.forward_destinations['forward_destinations']:
-        formatted_dict[key.split('|')[0]] = pihole.forward_destinations['forward_destinations'][key]
+        formatted_dict[key.split('|')[0]] = float(pihole.forward_destinations['forward_destinations'][key])
     
     return formatted_dict
 
@@ -88,7 +95,7 @@ def get_authenticated_data_for_influxdb():
         {
             'measurement': 'authenticated_query_types',
             'time': datetime.datetime.now(),
-            'fields': pihole.query_types
+            'fields': get_formatted_authenticated_query_types()
         },
         {
             'measurement': 'authenticated_forward_destinations',
