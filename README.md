@@ -20,7 +20,7 @@ By doing this you'll gain access to two new measurements (tables):
 - authenticated_query_types
 - authenticated_forward_destinations
 #### Sidenote
-This does mean that your password is stored in plaintext as an envronmental variable and as such as malicious actor could find it and access your PiHole instance. You are use this at your own risk.
+This does mean that your password is stored in plaintext as an envronmental variable and as such as malicious actor could find it and access your PiHole instance. You are advised to use this at your own risk.
 ### Docker Command
 ```
     docker run -d --name pihole-to-influx \
