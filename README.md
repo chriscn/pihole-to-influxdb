@@ -10,7 +10,7 @@ The InfluxDB connection settings can be configured as followed:
 - INFLUX_DB_PORT=8086
 - INFLUX_DB_USER=user
 - INFLUX_DB_PASSWORD=pass
-- INFLUX_DB_DATABASE=pihole
+- INFLUX_DB_DATABASE=pihole  
 The PiHole settings can be configured as followed:
 - PIHOLE_HOSTNAME=192.168.xxx.xxx
 - PIHOLE_INTERVAL=15 *Interval in seconds*
