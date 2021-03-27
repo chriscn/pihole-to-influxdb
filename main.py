@@ -86,8 +86,7 @@ def get_formatted_authenticated_query_types():
 def get_formatted_authenticated_forward_destinations():
     formatted_dict = {}
     for key in pihole.forward_destinations['forward_destinations']:
-        formatted_dict[key.split('|')[0]] = float(pihole.forward_destinations['forward_destinations'][key])
-    
+        formatted_dict[key.split('|')[0]] = pihole.forward_destinations['forward_destinations'][key]
     return formatted_dict
 
 def get_authenticated_data_for_influxdb():
@@ -115,6 +114,7 @@ def main():
         try:
             pihole.authenticate(AUTHENTICATION_TOKEN)
             pihole.refresh()
+            print('{} - Authentication successful'.format(datetime.datetime.now()))
         except:
             print("{} - Authentication failed using token: {}, disabling authentication.".format(datetime.datetime.now(), AUTHENTICATION_TOKEN))
             USE_AUTHENTICATION = False
