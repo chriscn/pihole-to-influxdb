@@ -6,30 +6,28 @@ This project is automatically built through GitHub actions and the DockerHub fil
 ## Setup
 ### Configuring the script
 The InfluxDB connection settings can be configured as followed:
-- INFLUX_DB_ADDRESS=192.168.xxx.xxx
-- INFLUX_DB_PORT=8086
-- INFLUX_DB_USER=user
-- INFLUX_DB_PASSWORD=pass
-- INFLUX_DB_DATABASE=pihole  
+- "INFLUX_DB_URL=http://192.168.xxx.xxx:8086"
+- "INFLUX_DB_ORG=\<your org name\>"
+- "INFLUX_DB_TOKEN=\<token\>"
+- "INFLUX_DB_BUCKET=pihole"
 
 The PiHole settings can be configured as followed:
 - PIHOLE_HOSTNAME=192.168.xxx.xxx
 - PIHOLE_INTERVAL=15 *Interval in seconds*
 ### Authentication
-Certain parts of the API require you to be authenticated, this can be achieved by supplying the `PIHOLE_AUTHENTICATION` token with the password you use to login to the web interface.  
+Certain parts of the API require you to be authenticated, this can be achieved by supplying the `PIHOLE_AUTHENTICATION` token with the token from the API settings page of the admin interface.  
 By doing this you'll gain access to two new measurements (tables): 
-- authenticated_query_types
-- authenticated_forward_destinations
+- query_types
+- forward_destinations
 #### Sidenote
-This does mean that your password is stored in plaintext as an envronmental variable and as such as malicious actor could find it and access your PiHole instance. You are advised to use this at your own risk.
+This does mean that your password is stored in plaintext as an environmental variable and as such as malicious actor could find it and access your PiHole instance. You are advised to use this at your own risk.
 ### Docker Command
 ```
     docker run -d --name pihole-to-influx \
-    -e 'INFLUX_DB_ADDRESS'='_influxdb_host_' \
-    -e 'INFLUX_DB_PORT'='8086' \
-    -e 'INFLUX_DB_USER'='_influx_user_' \
-    -e 'INFLUX_DB_PASSWORD'='_influx_pass_' \
-    -e 'INFLUX_DB_DATABASE'='pihole' \
+    -e 'INFLUX_DB_URL'='<influxdb url>' \
+    -e 'INFLUX_DB_ORG'='<influxdb org>' \
+    -e 'INFLUX_DB_TOKEN'='<influxdb token>' \
+    -e 'INFLUX_DB_BUCKET'='pihole' \
     -e 'PIHOLE_INTERVAL'='1800' \
     -e 'PIHOLE_HOSTNAME'='192.168.xxx.xxx'  \
     chriscn/pihole-to-influxdb
@@ -42,11 +40,10 @@ services:
         image: chriscn/pihole-to-influxdb
         container_name: pihole-to-influxdb
         environment:
-        - INFLUX_DB_ADDRESS=192.168.xxx.xxx
-        - INFLUX_DB_PORT=8086
-        - INFLUX_DB_USER=user
-        - INFLUX_DB_PASSWORD=pass
-        - INFLUX_DB_DATABASE=pihole
-        - PIHOLE_HOSTNAME=192.168.xxx.xxx
-        - PIHOLE_INTERVAL=15
+        - "INFLUX_DB_URL=http://192.168.xxx.xxx:8086"
+        - "INFLUX_DB_ORG=<your org name>"
+        - "INFLUX_DB_TOKEN=<token>"
+        - "INFLUX_DB_BUCKET=pihole"
+        - "PIHOLE_HOSTNAME=192.168.xxx.xxx"
+        - "PIHOLE_INTERVAL=15"
 ```

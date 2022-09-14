@@ -1,2 +1,2 @@
-influxdb
+influxdb-client
 PiHole-api
