@@ -8,23 +8,29 @@ from influxdb_client import InfluxDBClient, Point
 from influxdb_client.client.write_api import SYNCHRONOUS
 from pihole import PiHole # PiHole API Wrapper
 
-# Logger Settings
 logger = logging.Logger('pihole-to-influxdb')
 logger.addHandler(logging.StreamHandler(sys.stdout))
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "DEBUG"))
 
-# InfluxDB Settings
-DB_URL = os.environ.get('INFLUX_DB_URL')
-DB_ORG = os.environ.get('INFLUX_DB_ORG')
-DB_TOKEN = os.environ.get('INFLUX_DB_TOKEN')
-DB_BUCKET = os.environ.get('INFLUX_DB_BUCKET')
+try:
+    # optional Logger Settings
+    logging.basicConfig(level=os.getenv("LOGLEVEL", "DEBUG"))
 
-# PiHole Settings
-PIHOLE_HOSTNAME = str(os.environ.get('PIHOLE_HOSTNAME'))
-TEST_INTERVAL = int(os.environ.get('PIHOLE_INTERVAL'))
+    # InfluxDB Settings
+    DB_URL = os.environ['INFLUX_DB_URL']
+    DB_ORG = os.environ['INFLUX_DB_ORG']
+    DB_TOKEN = os.environ['INFLUX_DB_TOKEN']
+    DB_BUCKET = os.environ['INFLUX_DB_BUCKET']
 
-# Authentication
-AUTHENTICATION_TOKEN = os.environ.get('PIHOLE_AUTHENTICATION')
+    # PiHole Settings
+    PIHOLE_HOSTNAME = str(os.environ['PIHOLE_HOSTNAME'])
+    TEST_INTERVAL = int(os.environ['PIHOLE_INTERVAL'])
+
+    # optional Pi-hole authentication
+    AUTHENTICATION_TOKEN = os.getenv('PIHOLE_AUTHENTICATION', None)
+
+except KeyError as e:
+    logger.fatal('Missing environment variable: {}'.format(e))
+    sys.exit(1)
 
 influxdb_client = InfluxDBClient(DB_URL, DB_TOKEN, org=DB_ORG)
 
