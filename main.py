@@ -1,145 +1,148 @@
 import time
 import datetime
 import os
+import sys
+import logging
 
-from influxdb import InfluxDBClient
-import pihole as ph # PiHole API Wrapper
+from influxdb_client import InfluxDBClient, Point
+from influxdb_client.client.write_api import SYNCHRONOUS
+from pihole import PiHole # PiHole API Wrapper
 
-# InfluxDB Settings
-DB_ADDRESS = os.environ.get('INFLUX_DB_ADDRESS')
-DB_PORT = int(os.environ.get('INFLUX_DB_PORT'))
-DB_USER = os.environ.get('INFLUX_DB_USER')
-DB_PASSWORD = os.environ.get('INFLUX_DB_PASSWORD')
-DB_DATABASE = os.environ.get('INFLUX_DB_DATABASE')
+logger = logging.Logger('pihole-to-influxdb')
+logger.addHandler(logging.StreamHandler(sys.stdout))
 
-# PiHole Settings
-PIHOLE_HOSTNAME = str(os.environ.get('PIHOLE_HOSTNAME'))
-TEST_INTERVAL = int(os.environ.get('PIHOLE_INTERVAL'))
+try:
+    # optional Logger Settings
+    logging.basicConfig(level=os.getenv("LOGLEVEL", "DEBUG"))
 
-# Authentication
-AUTHENTICATION_TOKEN = os.environ.get('PIHOLE_AUTHENTICATION')
+    # InfluxDB Settings
+    DB_URL = os.environ['INFLUX_DB_URL']
+    DB_ORG = os.environ['INFLUX_DB_ORG']
+    DB_TOKEN = os.environ['INFLUX_DB_TOKEN']
+    DB_BUCKET = os.environ['INFLUX_DB_BUCKET']
 
-pihole = ph.PiHole(PIHOLE_HOSTNAME)
-influxdb_client = InfluxDBClient(DB_ADDRESS, DB_PORT, DB_USER, DB_PASSWORD, None)
+    # PiHole Settings
+    PIHOLE_HOSTNAME = str(os.environ['PIHOLE_HOSTNAME'])
+    TEST_INTERVAL = int(os.environ['PIHOLE_INTERVAL'])
 
-def init_db():
-    databases = influxdb_client.get_list_database()
+    # optional Pi-hole authentication
+    AUTHENTICATION_TOKEN = os.getenv('PIHOLE_AUTHENTICATION', None)
 
-    if len(list(filter(lambda x: x['name'] == DB_DATABASE, databases))) == 0:
-        influxdb_client.create_database(DB_DATABASE)  # Create if does not exist.
-        print('{} - Created database {}'.format(datetime.datetime.now(), DB_DATABASE))
-    else:
-        # Switch to if does exist.
-        influxdb_client.switch_database(DB_DATABASE)
-        print('{} - Switched to database {}'.format(datetime.datetime.now(), DB_DATABASE))
+except KeyError as e:
+    logger.fatal('Missing environment variable: {}'.format(e))
+    sys.exit(1)
 
+influxdb_client = InfluxDBClient(DB_URL, DB_TOKEN, org=DB_ORG)
 
-def get_data_for_influxdb():
-    influx_data = [
-        {
-            'measurement': 'domains',
-            'time': datetime.datetime.now(),
-            'fields': {
-                'domain_count': int(pihole.domain_count.replace(',','')),
-                'unique_domains': int(pihole.unique_domains.replace(',','')),
-                'forwarded': int(pihole.forwarded.replace(',','')),
-                'cached': int(pihole.cached.replace(',',''))
-            }
-        },
-        {
-            'measurement': 'queries',
-            'time': datetime.datetime.now(),
-            'fields': {
-                'queries': int(pihole.queries.replace(',','')),
-                'blocked': int(pihole.blocked.replace(',','')),
-                'ads_percentage': float(pihole.ads_percentage)
-            }   
-        },
-        {
-            'measurement': 'clients',
-            'time': datetime.datetime.now(),
-            'fields': {
-                'total_clients': int(pihole.total_clients.replace(',','')),
-                'unique_clients': int(pihole.unique_clients.replace(',','')),
-                'total_queries': int(pihole.total_queries.replace(',',''))
-            }
-        },
-        {
-            'measurement': 'other',
-            'time': datetime.datetime.now(),
-            'fields': {
-                'status': True if pihole.status == 'enabled' else False,
-                'gravity_last_update': pihole.gravity_last_updated['absolute']
-            }
-        }
+def get_data_for_influxdb(pihole: PiHole, timestamp: datetime.datetime):
+    return [
+        Point("domains") \
+            .time(timestamp) \
+            .tag("hostname", PIHOLE_HOSTNAME) \
+            .field("domain_count", int(pihole.domain_count.replace(',',''))) \
+            .field("unique_domains", int(pihole.unique_domains.replace(',',''))) \
+            .field("forwarded", int(pihole.forwarded.replace(',',''))) \
+            .field("cached", int(pihole.cached.replace(',',''))),
+
+        Point("queries") \
+            .time(timestamp) \
+            .tag("hostname", PIHOLE_HOSTNAME) \
+            .field("queries", int(pihole.queries.replace(',',''))) \
+            .field("blocked", int(pihole.blocked.replace(',',''))) \
+            .field("ads_percentage", float(pihole.ads_percentage)),
+
+        Point("clients") \
+            .time(timestamp) \
+            .tag("hostname", PIHOLE_HOSTNAME) \
+            .field("total_clients", int(pihole.total_clients.replace(',',''))) \
+            .field("unique_clients", int(pihole.unique_clients.replace(',',''))) \
+            .field("total_queries", int(pihole.total_queries.replace(',',''))),
+
+        Point("other") \
+            .time(timestamp) \
+            .tag("hostname", PIHOLE_HOSTNAME) \
+            .field("status", pihole.status == 'enabled') \
+            .field("gravity_last_update", pihole.gravity_last_updated['absolute'])
     ]
 
-    return influx_data
-
-def get_formatted_authenticated_query_types():
-    formatted_dict = {}
-    for key in pihole.query_types:
-        formatted_dict[key] = float(pihole.query_types[key])
+def get_authenticated_data_for_influxdb(pihole: PiHole, timestamp: datetime.datetime):
+    query_type_point = Point("query_types") \
+        .time(timestamp) \
+        .tag("hostname", PIHOLE_HOSTNAME)
     
-    return formatted_dict
+    for key, value in pihole.query_types.items():
+        query_type_point.field(key, float(value))
 
-def get_formatted_authenticated_forward_destinations():
-    formatted_dict = {}
-    for key in pihole.forward_destinations['forward_destinations']:
-        formatted_dict[key.split('|')[0]] = pihole.forward_destinations['forward_destinations'][key]
-    return formatted_dict
+    forward_destinations_point = Point("forward_destinations") \
+        .time(timestamp) \
+        .tag("hostname", PIHOLE_HOSTNAME)
+    
+    for key, value in pihole.forward_destinations['forward_destinations'].items():
+        forward_destinations_point.field(key.split('|')[0], value)
 
-def get_authenticated_data_for_influxdb():
-    influx_data = [
-        {
-            'measurement': 'authenticated_query_types',
-            'time': datetime.datetime.now(),
-            'fields': get_formatted_authenticated_query_types()
-        },
-        {
-            'measurement': 'authenticated_forward_destinations',
-            'time': datetime.datetime.now(),
-            'fields': get_formatted_authenticated_forward_destinations()
-        }
+    return [
+        query_type_point,
+        forward_destinations_point
     ]
 
-    return influx_data
+class Auth(object):
+    def __init__(self, token):
+        # PiHole's web token is just a double sha256 hash of the utf8 encoded password
+        self.token = token
+        self.auth_timestamp = time.time()
 
 def main():
-    init_db()
+    # pihole ctor has side effects, so we create it locally
+    pihole = PiHole(PIHOLE_HOSTNAME)
+
+    write_api = influxdb_client.write_api(write_options=SYNCHRONOUS)
 
     USE_AUTHENTICATION = False if AUTHENTICATION_TOKEN == None else True
 
     if USE_AUTHENTICATION:
         try:
-            pihole.authenticate(AUTHENTICATION_TOKEN)
+            pihole.auth_data = Auth(AUTHENTICATION_TOKEN)
             pihole.refresh()
-            print('{} - Authentication successful'.format(datetime.datetime.now()))
-        except:
-            print("{} - Authentication failed using token: {}, disabling authentication.".format(datetime.datetime.now(), AUTHENTICATION_TOKEN))
+            logger.info('Pi-Hole authentication successful')
+        except Exception as e:
+            logger.exception('Pi-Hole authentication failed')
             USE_AUTHENTICATION = False
             raise
+    
+    next_update = time.monotonic()
 
-    while(1):
-        pihole.refresh()
-        data = get_data_for_influxdb()
+    while True:
+        try:
 
-        if USE_AUTHENTICATION:
-            authenticated_data = get_authenticated_data_for_influxdb()
-            if influxdb_client.write_points(authenticated_data) == True:
-                print("{} - Authenticated data written to DB successfully".format(datetime.datetime.now()))
-            else:
-                print('{} - Failed to write authenticated points to the database'.format(datetime.datetime.now()))
+            pihole.refresh()
+            timestamp = datetime.datetime.now()
+            data = get_data_for_influxdb(pihole, timestamp)
 
-        if influxdb_client.write_points(data) == True:
-            print("{} - Data written to DB successfully".format(datetime.datetime.now()))
-            print("{} - Now sleeping for {}s".format(datetime.datetime.now(), TEST_INTERVAL))
-            time.sleep(TEST_INTERVAL)
-        else:
-            print('{} - Failed to write points to the database'.format(datetime.datetime.now()))
-            time.sleep(120) # Sleep for two seconds.
+            if USE_AUTHENTICATION:
+                authenticated_data = get_authenticated_data_for_influxdb(pihole, timestamp)
+                try:
+                    write_api.write(bucket=DB_BUCKET, record=authenticated_data)
+                except Exception as e:
+                    logger.exception('Failed to write authenticated data to InfluxDB')
 
+            try:
+                write_api.write(bucket=DB_BUCKET, record=data)
+                logger.debug('Wrote data to InfluxDB')
+                sleep_duration = TEST_INTERVAL
+            except Exception as e:
+                logger.exception('Failed to write data to InfluxDB')
+                # Sleep at most two minutes
+                sleep_duration = min(TEST_INTERVAL, 120)
+
+        except Exception as e:
+            logger.exception('Failed to get data from Pi-Hole')
+            # Sleep at most two minutes
+            sleep_duration = min(TEST_INTERVAL, 120)
+
+        next_update = next_update + sleep_duration
+        logger.debug("Now sleeping for {}".format(datetime.timedelta(seconds=sleep_duration)))
+        time.sleep(max(0, next_update - time.monotonic()))
 
 if __name__ == '__main__':
-    print('{} - PiHole Data Logger to InfluxDB'.format(datetime.datetime.now()))
+    logger.info('PiHole Data Logger to InfluxDB')
     main()
