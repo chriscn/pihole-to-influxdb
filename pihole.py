@@ -135,16 +135,20 @@ class PiHole:
 
     if self.token:
       query_types = self.request_query_types()
-      query_type_point = Point("query_types").time(timestamp).tag("hostname", self.host)
       for key, value in query_types.items():
-        query_type_point.field(key, float(value))
-      yield query_type_point
+        yield Point("query_types") \
+          .time(timestamp) \
+          .tag("hostname", self.host) \
+          .tag("query_type", key) \
+          .field("value", float(value))
 
       forward_destinations = self.request_forward_destinations()
-      forward_destinations_point = Point("forward_destinations").time(timestamp).tag("hostname", self.host)
       for key, value in forward_destinations.items():
-        forward_destinations_point.field(key.split('|')[0], value)
-      yield forward_destinations_point
+        yield Point("forward_destinations") \
+          .time(timestamp) \
+          .tag("hostname", self.host) \
+          .tag("destination", key.split('|')[0]) \
+          .field("value", float(value))
   
   def get_queries_for_influxdb(self, query_date: datetime, sample_period: int):
     # Get all queries since last sample
@@ -191,15 +195,19 @@ class PiHole:
       .field("status", summary['status'] == 'enabled') \
       .field("gravity_last_update", summary['gravity_last_updated']['absolute'])
 
-    query_type_point = Point("query_types").time(timestamp).tag("hostname", self.host)
     for key, group_df in df.groupby('query_type'):
-      query_type_point.field(key, len(group_df))
-    yield query_type_point
+      yield Point("query_types") \
+        .time(timestamp) \
+        .tag("hostname", self.host) \
+        .tag("query_type", key) \
+        .field("queries", len(group_df))
 
-    forward_destinations_point = Point("forward_destinations").time(timestamp).tag("hostname", self.host)
     for key, group_df in df.groupby('destination'):
-      forward_destinations_point.field(key.split('|')[0], len(group_df))
-    yield forward_destinations_point
+      yield Point("forward_destinations") \
+        .time(timestamp) \
+        .tag("hostname", self.host) \
+        .tag("destination", key.split('|')[0]) \
+        .field("queries", len(group_df))
 
   def get_logs_for_influxdb(self, query_date: datetime, sample_period: int):
     end_time = query_date.timestamp()
