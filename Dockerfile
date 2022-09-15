@@ -1,4 +1,4 @@
-FROM python:3.9-slim-buster
+FROM python:3.9-slim-bullseye
 
 LABEL maintainer="Christopher Nethercott" \
     description="PiHole to InfluxDB data bridge"
