@@ -66,24 +66,19 @@ def get_data_for_influxdb(pihole: PiHole, timestamp: datetime.datetime):
     ]
 
 def get_authenticated_data_for_influxdb(pihole: PiHole, timestamp: datetime.datetime):
-    query_type_point = Point("query_types") \
-        .time(timestamp) \
-        .tag("hostname", PIHOLE_HOSTNAME)
-    
     for key, value in pihole.query_types.items():
-        query_type_point.field(key, float(value))
-
-    forward_destinations_point = Point("forward_destinations") \
-        .time(timestamp) \
-        .tag("hostname", PIHOLE_HOSTNAME)
+        yield Point("query_types") \
+            .time(timestamp) \
+            .tag("hostname", PIHOLE_HOSTNAME) \
+            .tag("query_type", key) \
+            .field("value", float(value))
     
     for key, value in pihole.forward_destinations['forward_destinations'].items():
-        forward_destinations_point.field(key.split('|')[0], value)
-
-    return [
-        query_type_point,
-        forward_destinations_point
-    ]
+        yield Point("forward_destinations") \
+            .time(timestamp) \
+            .tag("hostname", PIHOLE_HOSTNAME) \
+            .tag("destination", key.split('|')[0]) \
+            .field("value", value)
 
 class Auth(object):
     def __init__(self, token):
@@ -113,13 +108,12 @@ def main():
 
     while True:
         try:
-
             pihole.refresh()
             timestamp = datetime.datetime.now()
             data = get_data_for_influxdb(pihole, timestamp)
 
             if USE_AUTHENTICATION:
-                authenticated_data = get_authenticated_data_for_influxdb(pihole, timestamp)
+                authenticated_data = list(get_authenticated_data_for_influxdb(pihole, timestamp))
                 try:
                     write_api.write(bucket=DB_BUCKET, record=authenticated_data)
                 except Exception as e:
