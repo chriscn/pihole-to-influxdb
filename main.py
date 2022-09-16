@@ -34,14 +34,15 @@ try:
   # optional Pi-hole authentication
   AUTHENTICATION_TOKEN = os.getenv('PIHOLE_AUTHENTICATION', None)
 
-  # optional App Mode
-  APP_MODE = AppMode(os.getenv('APP_MODE', 'Totals'))
-
 except KeyError as e:
   logger.fatal('Missing environment variable: {}'.format(e))
   sys.exit(1)
-except ValueError as e:
-  logger.fatal('Invalid environment variable: {}'.format(e))
+
+try:
+  # optional App Mode
+  APP_MODE = AppMode[os.getenv('APP_MODE', 'Totals')]
+except KeyError as e:
+  logger.fatal('{} is not a valid AppMode'.format(e))
   sys.exit(1)
 
 if APP_MODE != AppMode.Totals and not AUTHENTICATION_TOKEN:
@@ -56,7 +57,7 @@ def main():
   next_update = time.monotonic()
 
   logger.info('Starting PiHole Data Logger to InfluxDB')
-  logger.info('AppMode: {}'.format(APP_MODE))
+  logger.info('AppMode: {}'.format(APP_MODE.name))
 
   # Test Pi-hole connection
   try:

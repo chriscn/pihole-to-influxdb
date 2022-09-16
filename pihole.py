@@ -6,7 +6,6 @@ from datetime import datetime
 from enum import Enum
 from influxdb_client import Point
 from pandas import DataFrame
-from urllib.parse import urlparse
 
 class QueryStati(Enum):
   Blocked = 1
@@ -16,14 +15,16 @@ class QueryStati(Enum):
   Unknown = 5
 
 class PiHole:
-  def __init__(self, url, token):
-    self.host = url
-    self.url = urlparse(url)
+  def __init__(self, host, token):
+    self.host = host
+    if host.startswith("http"):
+      self.url = host
+    else:
+      self.url = f"http://{host}"
     self.token = token
 
   def query(self, endpoint, params={}):
-    url = "{}://{}/admin/{}.php".format(self.url.scheme or "http", self.url.netloc, endpoint)
-    return requests.get(url, params=params)
+    return requests.get(f"{self.url}/admin/{endpoint}.php", params=params)
   
   def request_all_queries(self, start: float, end: float):
     """
