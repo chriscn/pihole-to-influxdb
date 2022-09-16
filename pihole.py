@@ -2,10 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
 from influxdb_client import Point
 from pandas import DataFrame
+from urllib.parse import urlparse
 
 class QueryStati(Enum):
   Blocked = 1
@@ -15,12 +16,13 @@ class QueryStati(Enum):
   Unknown = 5
 
 class PiHole:
-  def __init__(self, host, token):
-    self.host = host
+  def __init__(self, url, token):
+    url = urlparse(url)
+    self.url = "{}://{}".format(url.scheme or "http", url.netloc)
     self.token = token
 
   def query(self, endpoint, params={}):
-    url = f"http://{self.host}/admin/{endpoint}.php"
+    url = f"{self.url}/admin/{endpoint}.php"
     return requests.get(url, params=params)
   
   def request_all_queries(self, start: float, end: float):
@@ -209,7 +211,7 @@ class PiHole:
         .tag("destination", key.split('|')[0]) \
         .field("queries", len(group_df))
 
-  def get_logs_for_influxdb(self, query_date: datetime, sample_period: int):
+  def get_query_logs_for_influxdb(self, query_date: datetime, sample_period: int):
     end_time = query_date.timestamp()
     start_time = end_time - sample_period + 1
 
