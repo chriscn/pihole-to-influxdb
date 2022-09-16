@@ -1,9 +1,9 @@
 # pihole-to-influxdb
 
 ## Introduction
-Based slightly on my other project, [speedtest-to-influxdb](https://github.com/chriscn/speedtest-to-influxdb). This project leverages the [Pi-Hole](https://pi-hole.net/) API to gather data about your PiHole instance and store it inside of InfluxDB for your future projects.
+Based slightly on my other project, [speedtest-to-influxdb](https://github.com/chriscn/speedtest-to-influxdb). This project leverages the [Pi-Hole](https://pi-hole.net/) API to gather data about your PiHole instance and store it inside of InfluxDB for your future projects. An example dashoard can be found [here](Pi-hole-grafana-dashboard.json).
 
-This project is automatically built through GitHub actions and the DockerHub file can be found [here](https://hub.docker.com/r/chriscn/pihole-to-influxdb).
+This project is automatically built through GitHub actions and published to [DockerHub](https://hub.docker.com/r/chriscn/pihole-to-influxdb).
 
 ## Setup
 
@@ -24,9 +24,9 @@ Optionally you can also configure the following:
 - `APP_MODE=Totals`
 
 ### Authentication
-Certain parts of the API require you to be authenticated, this can be achieved by supplying the `PIHOLE_AUTHENTICATION` token with the token from the API settings page of the admin interface.
+Certain parts of the API require you to be authenticated, this can be achieved by supplying the `PIHOLE_AUTHENTICATION` environment variable with the token from the API settings page of the admin interface.
 
-By doing this you'll gain access to two new measurements (tables): 
+By doing this you'll gain access to two new measurements (tables):
 - query_types
 - forward_destinations
 
@@ -43,30 +43,30 @@ The `APP_MODE` changes the way the script works. The default mode is `Totals` wh
 
 ### Docker Command
 ```
-    docker run -d --name pihole-to-influx \
-    -e 'INFLUX_DB_URL'='<influxdb url>' \
-    -e 'INFLUX_DB_ORG'='<influxdb org>' \
-    -e 'INFLUX_DB_TOKEN'='<influxdb token>' \
-    -e 'INFLUX_DB_BUCKET'='pihole' \
-    -e 'PIHOLE_INTERVAL'='1800' \
-    -e 'PIHOLE_URL'='192.168.xxx.xxx'  \
-    chriscn/pihole-to-influxdb
+docker run -d --name pihole-to-influx \
+  -e 'INFLUX_DB_URL'='<influxdb url>' \
+  -e 'INFLUX_DB_ORG'='<influxdb org>' \
+  -e 'INFLUX_DB_TOKEN'='<influxdb token>' \
+  -e 'INFLUX_DB_BUCKET'='pihole' \
+  -e 'PIHOLE_INTERVAL'='1800' \
+  -e 'PIHOLE_URL'='192.168.xxx.xxx'  \
+  chriscn/pihole-to-influxdb
 ```
 ### docker-compose
 ```yaml
 version: '3'
 services:
-    pihole-to-influxdb:
-        image: chriscn/pihole-to-influxdb
-        container_name: pihole-to-influxdb
-        environment:
-        - "INFLUX_DB_URL=http://192.168.xxx.xxx:8086"
-        - "INFLUX_DB_ORG=myOrg"
-        - "INFLUX_DB_TOKEN=<token>"
-        - "INFLUX_DB_BUCKET=pihole"
-        - "PIHOLE_URL=http://192.168.xxx.xxx"
-        - "PIHOLE_INTERVAL=15"
-        - "PIHOLE_AUTHENTICATION=<token>"
-        - "LOG_LEVEL=DEBUG"
-        - "APP_MODE=Totals"
+  pihole-to-influxdb:
+    image: chriscn/pihole-to-influxdb
+    container_name: pihole-to-influxdb
+    environment:
+    - "INFLUX_DB_URL=http://192.168.xxx.xxx:8086"
+    - "INFLUX_DB_ORG=myOrg"
+    - "INFLUX_DB_TOKEN=<token>"
+    - "INFLUX_DB_BUCKET=pihole"
+    - "PIHOLE_URL=http://192.168.xxx.xxx"
+    - "PIHOLE_INTERVAL=15"
+    - "PIHOLE_AUTHENTICATION=<token>"
+    - "LOG_LEVEL=DEBUG"
+    - "APP_MODE=Totals"
 ```
