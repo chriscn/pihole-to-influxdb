@@ -7,12 +7,59 @@ from enum import Enum
 from influxdb_client import Point
 from pandas import DataFrame
 
+ALLOWED_STATUS_TYPES = (2, 3, 12, 13, 14)
+BLOCKED_STATUS_TYPES = (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16)
+
 class QueryStati(Enum):
-  Blocked = 1
+  """
+  https://docs.pi-hole.net/database/ftl/#supported-status-types
+  """
+  Unknown = 0 # Unknown status (not yet known)
+  Blocked = 1 # Domain contained in gravity database
   Forwarded = 2
-  Cached = 3
-  Wildcard = 4
-  Unknown = 5
+  Cached = 3 # Known, replied to from cache
+  Blacklist_regex = 4
+  Blacklist_exact = 5
+  Blocked_upstream = 6
+  Blocked_upstream_zero = 7
+  Blocked_upstream_nxdomain = 8
+  Blocked_gravity = 9
+  Blocked_gravity_regex = 10
+  Blocked_gravity_exact = 11
+  Allowed_retried = 12
+  Allowed_retried_ignored = 13
+  Allowed_forwarded = 14
+  Blocked_database_busy = 15
+  Blocked_special_domain = 16
+
+class ReplyTypes(Enum):
+  """
+  https://docs.pi-hole.net/database/ftl/#supported-reply-types
+  """
+  unknown = 0 # no reply so far
+  NODATA = 1
+  NXDOMAIN = 2
+  CNAME = 3
+  IP = 4 # a valid IP record
+  DOMAIN = 5
+  RRNAME = 6
+  SERVFAIL = 7
+  REFUSED = 8
+  NOTIMP = 9
+  OTHER = 10
+  DNSSEC = 11
+  NONE = 12 # query was dropped intentionally
+  BLOB = 13 # binary data
+
+class DnssecStati(Enum):
+  """
+  https://docs.pi-hole.net/database/ftl/#dnssec-status
+  """
+  Unknown = 0
+  Secure = 1
+  Insecure = 2
+  Bogus = 3
+  Abandoned = 4
 
 class PiHole:
   def __init__(self, host, token):
@@ -172,7 +219,7 @@ class PiHole:
       .field("forwarded", len(df[df['status'] == QueryStati.Forwarded.value])) \
       .field("cached", len(df[df['status'] == QueryStati.Cached.value]))
     
-    blocked_count = len(df[(df['status'] == QueryStati.Blocked.value) | (df['status'] == QueryStati.Wildcard.value)])
+    blocked_count = len(df[df['status'].isin(BLOCKED_STATUS_TYPES)])
     queries_point = Point("queries") \
       .time(timestamp) \
       .tag("hostname", self.host) \
@@ -182,7 +229,7 @@ class PiHole:
     yield queries_point
 
     for key, client_df in df.groupby('client'):
-      blocked_count = len(client_df[(client_df['status'] == QueryStati.Blocked.value) | (client_df['status'] == QueryStati.Wildcard.value)])
+      blocked_count = len(client_df[client_df['status'].isin(BLOCKED_STATUS_TYPES)])
       clients_point = Point("clients") \
         .time(timestamp) \
         .tag("hostname", self.host) \
@@ -224,9 +271,10 @@ class PiHole:
         .tag("query_type", query_type) \
         .field("domain", domain) \
         .tag("client", client) \
-        .tag("status", QueryStati(status)) \
-        .tag("dnssec", dnssec != 0) \
-        .field("reply_time", reply_time)
+        .tag("status", QueryStati(status).name) \
+        .tag("reply_type", ReplyTypes(reply_type).name) \
+        .field("reply_time", reply_time) \
+        .tag("dnssec", DnssecStati(dnssec).name)
       if destination:
         p.tag("destination", destination)
       yield p
