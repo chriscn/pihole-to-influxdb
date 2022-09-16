@@ -17,12 +17,12 @@ class QueryStati(Enum):
 
 class PiHole:
   def __init__(self, url, token):
-    url = urlparse(url)
-    self.url = "{}://{}".format(url.scheme or "http", url.netloc)
+    self.host = url
+    self.url = urlparse(url)
     self.token = token
 
   def query(self, endpoint, params={}):
-    url = f"{self.url}/admin/{endpoint}.php"
+    url = "{}://{}/admin/{}.php".format(self.url.scheme or "http", self.url.netloc, endpoint)
     return requests.get(url, params=params)
   
   def request_all_queries(self, start: float, end: float):
