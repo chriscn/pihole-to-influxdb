@@ -123,7 +123,13 @@ class PiHole:
       - status
       - gravity_last_update: file_exists, absolute, relative
     """
-    json = self.query("api").json()
+    if not self.token:
+      raise Exception("Token required")
+    params = {
+      "summaryRaw": "",
+      "auth": self.token
+    }
+    json = self.query("api", params=params).json()
     return json
   
   def request_forward_destinations(self):

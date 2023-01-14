@@ -24,22 +24,20 @@ Optionally you can also configure the following:
 - `APP_MODE=Totals`
 
 ### Authentication
-Certain parts of the API require you to be authenticated, this can be achieved by supplying the `PIHOLE_AUTHENTICATION` environment variable with the token from the API settings page of the admin interface.
-
-By doing this you'll gain access to two new measurements (tables):
-- query_types
-- forward_destinations
-
-and the following app modes:
-- `APP_MODE=Totals` *This is the default mode*
-- `APP_MODE=Live`
-- `APP_MODE=Raw`
+The Pi-Hole API requires you to be authenticated. This can be achieved by supplying the `PIHOLE_AUTHENTICATION` environment variable with the token from the API settings page of the admin interface.
 
 #### Sidenote
 This does mean that your token is stored in plaintext as an environment variable and as such as malicious actor could find it and access your PiHole instance. You are advised to use this at your own risk.
 
 ### App Modes
-The `APP_MODE` changes the way the script works. The default mode is `Totals` which will only send the daily totals of the PiHole instance, as displayed in the GUI. Another mode is `Live` which will send a summary of the Pi-hole queries of the last `PIHOLE_INTERVAL` seconds. The last mode is `Raw` which will send the raw data of the Pi-hole queries.
+The `APP_MODE` changes the way the script works. 
+
+There are three modes available to choose from:
+- `APP_MODE=Totals` *This is the default mode*
+- `APP_MODE=Live`
+- `APP_MODE=Raw`
+
+The default mode is `Totals` which will only send the daily totals of the PiHole instance, as displayed in the GUI. Another mode is `Live` which will send a summary of the Pi-hole queries of the last `PIHOLE_INTERVAL` seconds. The last mode is `Raw` which will send the raw data of the Pi-hole queries.
 
 ### Docker Command
 ```
@@ -52,6 +50,7 @@ docker run -d --name pihole-to-influx \
   -e 'PIHOLE_URL'='192.168.xxx.xxx'  \
   chriscn/pihole-to-influxdb
 ```
+
 ### docker-compose
 ```yaml
 version: '3'
