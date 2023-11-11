@@ -1,4 +1,4 @@
-FROM alpine:3.18.4
+FROM debian:bookworm-slim
 
 LABEL maintainer="Christopher Nethercott" \
     description="PiHole to InfluxDB data bridge"
@@ -7,11 +7,14 @@ WORKDIR /app
 
 # Install Python packages
 COPY requirements.txt .
-RUN apk add --update --no-cache python3 py3-pip py3-pandas && \
-    python3 -m pip install -r requirements.txt
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends python3 python3-pip python3-pandas && \
+  python3 -m pip install -r requirements.txt
 
-# Cleanup
-RUN rm -rf /var/cache/apk/*
+# Clean up
+RUN apt-get -q -y autoremove && \
+  apt-get -q -y clean && \
+  rm -rf /var/lib/apt/lists/*
 
 # Final setup & execution
 COPY . /app
