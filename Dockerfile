@@ -9,7 +9,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN apt-get update && \
   apt-get install -y --no-install-recommends python3 python3-pip python3-pandas && \
-  python3 -m pip install -r requirements.txt
+  python3 -m pip install -r requirements.txt --break-system-packages
 
 # Clean up
 RUN apt-get -q -y autoremove && \
