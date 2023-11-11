@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 LABEL maintainer="Christopher Nethercott" \
     description="PiHole to InfluxDB data bridge"
