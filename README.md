@@ -17,17 +17,17 @@ The InfluxDB connection settings can be configured as followed:
 The PiHole settings can be configured as followed:
 - `PIHOLE_URL=http://192.168.xxx.xxx`
 - `PIHOLE_INTERVAL=15` *Interval in seconds*
+- `PIHOLE_AUTHENTICATION=<password>`
 
 Optionally you can also configure the following:
-- `PIHOLE_AUTHENTICATION=<token>`
 - `LOG_LEVEL=DEBUG`
 - `APP_MODE=Totals`
 
 ### Authentication
-The Pi-Hole API requires you to be authenticated. This can be achieved by supplying the `PIHOLE_AUTHENTICATION` environment variable with the token from the API settings page of the admin interface.
+The Pi-Hole API requires you to be authenticated. This can be achieved by supplying the `PIHOLE_AUTHENTICATION` environment variable with your password or an API password from the settings page of the admin interface.
 
 #### Sidenote
-This does mean that your token is stored in plaintext as an environment variable and as such as malicious actor could find it and access your PiHole instance. You are advised to use this at your own risk.
+This does mean that your password is stored in plaintext as an environment variable and as such as malicious actor could find it and access your PiHole instance. You are advised to use this at your own risk.
 
 ### App Modes
 The `APP_MODE` changes the way the script works. 
@@ -48,6 +48,7 @@ docker run -d --name pihole-to-influx \
   -e 'INFLUX_DB_BUCKET'='pihole' \
   -e 'PIHOLE_INTERVAL'='1800' \
   -e 'PIHOLE_URL'='192.168.xxx.xxx'  \
+  -e 'PIHOLE_AUTHENTICATION'='<password>'  \
   chriscn/pihole-to-influxdb
 ```
 
@@ -65,7 +66,7 @@ services:
     - "INFLUX_DB_BUCKET=pihole"
     - "PIHOLE_URL=http://192.168.xxx.xxx"
     - "PIHOLE_INTERVAL=15"
-    - "PIHOLE_AUTHENTICATION=<token>"
+    - "PIHOLE_AUTHENTICATION=<password>"
     - "LOG_LEVEL=DEBUG"
     - "APP_MODE=Totals"
 ```

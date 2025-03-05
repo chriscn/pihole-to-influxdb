@@ -32,7 +32,7 @@ try:
   QUERY_INTERVAL = int(os.environ['PIHOLE_INTERVAL'])
 
   # optional Pi-hole authentication
-  AUTHENTICATION_TOKEN = os.getenv('PIHOLE_AUTHENTICATION', None)
+  PASSWORD = os.environ['PIHOLE_AUTHENTICATION']
 
 except KeyError as e:
   logger.fatal('Missing environment variable: {}'.format(e))
@@ -45,12 +45,8 @@ except KeyError as e:
   logger.fatal('{} is not a valid AppMode'.format(e))
   sys.exit(1)
 
-if APP_MODE != AppMode.Totals and not AUTHENTICATION_TOKEN:
-  logger.fatal('Pi-hole authentication token is required for live data')
-  sys.exit(1)
-
 influxdb_client = InfluxDBClient(DB_URL, DB_TOKEN, org=DB_ORG)
-pihole = PiHole(PIHOLE_URL, AUTHENTICATION_TOKEN)
+pihole = PiHole(PIHOLE_URL, PASSWORD)
 
 def main():
   write_api = influxdb_client.write_api(write_options=SYNCHRONOUS)
@@ -68,13 +64,13 @@ def main():
 
   while True:
     try:
+      timestamp = datetime.datetime.now()
       if APP_MODE == AppMode.Live:
-        timestamp = datetime.datetime.now()
         data = list(pihole.get_queries_for_influxdb(timestamp, QUERY_INTERVAL))
       elif APP_MODE == AppMode.Totals:
         data = list(pihole.get_totals_for_influxdb())
       elif APP_MODE == AppMode.Raw:
-        data = list(pihole.get_query_logs_for_influxdb())
+        data = list(pihole.get_query_logs_for_influxdb(timestamp, QUERY_INTERVAL))
 
       logger.debug('Writing {} points to InfluxDB'.format(len(data)))
       write_api.write(bucket=DB_BUCKET, record=data)

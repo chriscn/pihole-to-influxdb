@@ -5,158 +5,61 @@ import requests
 from datetime import datetime
 from enum import Enum
 from influxdb_client import Point
-from pandas import DataFrame
-
-ALLOWED_STATUS_TYPES = (2, 3, 12, 13, 14)
-BLOCKED_STATUS_TYPES = (1, 4, 5, 6, 7, 8, 9, 10, 11, 15, 16)
-
-class QueryStati(Enum):
-  """
-  https://docs.pi-hole.net/database/ftl/#supported-status-types
-  """
-  Unknown = 0 # Unknown status (not yet known)
-  Blocked = 1 # Domain contained in gravity database
-  Forwarded = 2
-  Cached = 3 # Known, replied to from cache
-  Blacklist_regex = 4
-  Blacklist_exact = 5
-  Blocked_upstream = 6
-  Blocked_upstream_zero = 7
-  Blocked_upstream_nxdomain = 8
-  Blocked_gravity = 9
-  Blocked_gravity_regex = 10
-  Blocked_gravity_exact = 11
-  Allowed_retried = 12
-  Allowed_retried_ignored = 13
-  Allowed_forwarded = 14
-  Blocked_database_busy = 15
-  Blocked_special_domain = 16
-
-class ReplyTypes(Enum):
-  """
-  https://docs.pi-hole.net/database/ftl/#supported-reply-types
-  """
-  unknown = 0 # no reply so far
-  NODATA = 1
-  NXDOMAIN = 2
-  CNAME = 3
-  IP = 4 # a valid IP record
-  DOMAIN = 5
-  RRNAME = 6
-  SERVFAIL = 7
-  REFUSED = 8
-  NOTIMP = 9
-  OTHER = 10
-  DNSSEC = 11
-  NONE = 12 # query was dropped intentionally
-  BLOB = 13 # binary data
-
-class DnssecStati(Enum):
-  """
-  https://docs.pi-hole.net/database/ftl/#dnssec-status
-  """
-  Unknown = 0
-  Secure = 1
-  Insecure = 2
-  Bogus = 3
-  Abandoned = 4
 
 class PiHole:
-  def __init__(self, host, token):
+  def __init__(self, host, password):
     self.host = host
     if host.startswith("http"):
       self.url = host
     else:
       self.url = f"http://{host}"
-    self.token = token
+
+    if password:
+      json = self.post("auth", {'password': password}).json()
+      if not 'session' in json or not json['session']['valid']:
+        print(f"auth response: {json}")
+      self.sid = json['session']['sid']
+      self.csrf = json['session'].get('csrf', None)
+
+  def post(self, endpoint, params={}):
+    return requests.post(f"{self.url}/api/{endpoint}", json=params)
 
   def query(self, endpoint, params={}):
-    return requests.get(f"{self.url}/admin/{endpoint}.php", params=params)
+    return requests.get(f"{self.url}/api/{endpoint}", params=params)
   
   def request_all_queries(self, start: float, end: float):
-    """
-    keys[]: time, query_type, domain, client, status, destination, reply_type, reply_time, dnssec
-    """
-    if not self.token:
-      raise Exception("Token required")
+    if not self.sid:
+      raise Exception("Password required")
     params = {
-      "getAllQueries": "",
       "from": int(start),
       "until": int(end),
-      "auth": self.token
+      "length": 100000,
+      "sid": self.sid
       }
-    json = self.query("api_db", params=params).json()
-    if json:
-      return json['data']
-    else:
-      return []
+    json = self.query("queries", params=params).json()
+    if not 'queries' in json:
+      print(f"API response: {json}")
+    return json['queries']
 
   def request_summary(self):
-    """
-    keys: 
-      - domains_being_blocked
-      - dns_queries_today
-      - ads_blocked_today
-      - ads_percentage_today
-      - unique_domains
-      - queries_forwarded
-      - queries_cached
-      - clients_ever_seen
-      - unique_clients
-      - dns_queries_all_types
-      - reply_UNKNOWN
-      - reply_NODATA
-      - reply_NXDOMAIN
-      - reply_CNAME
-      - reply_IP
-      - reply_DOMAIN
-      - reply_RRNAME
-      - reply_SERVFAIL
-      - reply_REFUSED
-      - reply_NOTIMP
-      - reply_OTHER
-      - reply_DNSSEC
-      - reply_NONE
-      - reply_BLOB
-      - dns_queries_all_replies
-      - privacy_level
-      - status
-      - gravity_last_update: file_exists, absolute, relative
-    """
-    if not self.token:
-      raise Exception("Token required")
+    if not self.sid:
+      raise Exception("Password required")
     params = {
-      "summaryRaw": "",
-      "auth": self.token
+      "sid": self.sid
     }
-    json = self.query("api", params=params).json()
+    json = self.query("stats/summary", params=params).json()
     return json
   
   def request_forward_destinations(self):
-    if not self.token:
-      raise Exception("Token required")
+    if not self.sid:
+      raise Exception("Password required")
     params = {
-      "getForwardDestinations": "",
-      "auth": self.token
+      "sid": self.sid
       }
-    json = self.query("api", params=params).json()
-    if json:
-      return json['forward_destinations']
-    else:
-      return {}
-
-  def request_query_types(self):
-    if not self.token:
-      raise Exception("Token required")
-    params = {
-      "getQueryTypes": "",
-      "auth": self.token
-      }
-    json = self.query("api", params=params).json()
-    if json:
-      return json['querytypes']
-    else:
-      return {}
+    json = self.query("stats/upstreams", params=params).json()
+    if not 'upstreams' in json:
+      print(f"API response: {json}")
+    return json['upstreams']
 
   def get_totals_for_influxdb(self):
     summary = self.request_summary()
@@ -164,47 +67,45 @@ class PiHole:
     yield Point("domains") \
       .time(timestamp) \
       .tag("hostname", self.host) \
-      .field("domain_count", summary['domains_being_blocked']) \
-      .field("unique_domains", summary['unique_domains']) \
-      .field("forwarded", summary['queries_forwarded']) \
-      .field("cached", summary['queries_cached'])
+      .field("domain_count", summary['gravity']['domains_being_blocked']) \
+      .field("unique_domains", summary['queries']['unique_domains']) \
+      .field("forwarded", summary['queries']['forwarded']) \
+      .field("cached", summary['queries']['cached'])
       
     yield Point("queries") \
       .time(timestamp) \
       .tag("hostname", self.host) \
-      .field("queries", summary['dns_queries_today']) \
-      .field("blocked", summary['ads_blocked_today']) \
-      .field("ads_percentage", summary['ads_percentage_today'])
+      .field("queries", summary['queries']['total']) \
+      .field("blocked", summary['queries']['blocked']) \
+      .field("ads_percentage", summary['queries']['percent_blocked'])
       
     yield Point("clients") \
       .time(timestamp) \
       .tag("hostname", self.host) \
-      .field("total_clients", summary['clients_ever_seen']) \
-      .field("unique_clients", summary['unique_clients']) \
-      .field("total_queries", summary['dns_queries_all_types'])
+      .field("total_clients", summary['clients']['total']) \
+      .field("unique_clients", summary['clients']['active']) \
+      .field("total_queries", sum(summary['queries']['types'].values()))
       
     yield Point("other") \
       .time(timestamp) \
       .tag("hostname", self.host) \
-      .field("status", summary['status'] == 'enabled') \
-      .field("gravity_last_update", summary['gravity_last_updated']['absolute'])
+      .field("gravity_last_update", summary['gravity']['last_update'])
 
-    if self.token:
-      query_types = self.request_query_types()
-      for key, value in query_types.items():
-        yield Point("query_types") \
-          .time(timestamp) \
-          .tag("hostname", self.host) \
-          .tag("query_type", key) \
-          .field("value", float(value))
+    for key, value in summary['queries']['types'].items():
+      yield Point("query_types") \
+        .time(timestamp) \
+        .tag("hostname", self.host) \
+        .tag("query_type", key) \
+        .field("value", float(value))
 
-      forward_destinations = self.request_forward_destinations()
-      for key, value in forward_destinations.items():
-        yield Point("forward_destinations") \
-          .time(timestamp) \
-          .tag("hostname", self.host) \
-          .tag("destination", key.split('|')[0]) \
-          .field("value", float(value))
+    forward_destinations = self.request_forward_destinations()
+    for upstream in forward_destinations:
+      yield Point("forward_destinations") \
+        .time(timestamp) \
+        .tag("hostname", self.host) \
+        .tag("ip", upstream['ip']) \
+        .tag("destination", upstream['name'] or upstream['ip']) \
+        .field("value", float(upstream['count']))
   
   def get_queries_for_influxdb(self, query_date: datetime, sample_period: int):
     # Get all queries since last sample
@@ -212,7 +113,6 @@ class PiHole:
     start_time = end_time - sample_period + 1
     queries = self.request_all_queries(start_time, end_time)
     timestamp = datetime.now().astimezone()
-    df = DataFrame(queries, columns=['time', 'query_type', 'domain', 'client', 'status', 'destination', 'reply_type', 'reply_time', 'dnssec'])
 
     # we still need some stats from the summary
     summary = self.request_summary()
@@ -220,78 +120,89 @@ class PiHole:
     yield Point("domains") \
       .time(timestamp) \
       .tag("hostname", self.host) \
-      .field("domain_count", summary['domains_being_blocked']) \
-      .field("unique_domains", len(df.groupby('domain'))) \
-      .field("forwarded", len(df[df['status'] == QueryStati.Forwarded.value])) \
-      .field("cached", len(df[df['status'] == QueryStati.Cached.value]))
+      .field("domain_count", summary['gravity']['domains_being_blocked']) \
+      .field("unique_domains", len(set(x['domain'] for x in queries))) \
+      .field("forwarded", sum(1 for x in queries if x['status'].startswith("FORWARDED"))) \
+      .field("cached", sum(1 for x in queries if x['status'].startswith("CACHED")))
     
-    blocked_count = len(df[df['status'].isin(BLOCKED_STATUS_TYPES)])
+    blocked_count = sum(1 for x in queries if x['status'].startswith("BLOCKED") or x['status'].startswith("BLACKLIST"))
     queries_point = Point("queries") \
       .time(timestamp) \
       .tag("hostname", self.host) \
-      .field("queries", len(df)) \
+      .field("queries", len(queries)) \
       .field("blocked", blocked_count) \
-      .field("ads_percentage", blocked_count * 100.0 / max(1, len(df)))
+      .field("ads_percentage", blocked_count * 100.0 / max(1, len(queries)))
     yield queries_point
 
-    for key, client_df in df.groupby('client'):
-      blocked_count = len(client_df[client_df['status'].isin(BLOCKED_STATUS_TYPES)])
+    clients = {}
+    for query in queries:
+      name = query['client']['name'] or query['client']['ip']
+      group = clients.get(name, [])
+      group.append(query)
+      clients[name] = group
+    for name, group in clients.items():
+      blocked_count = sum(1 for x in group if x['status'].startswith("BLOCKED") or x['status'].startswith("BLACKLIST"))
       clients_point = Point("clients") \
         .time(timestamp) \
         .tag("hostname", self.host) \
-        .tag("client", key) \
-        .field("queries", len(client_df)) \
+        .tag("client", name) \
+        .field("queries", len(group)) \
         .field("blocked", blocked_count) \
-        .field("ads_percentage", blocked_count * 100.0 / max(1, len(client_df)))
+        .field("ads_percentage", blocked_count * 100.0 / max(1, len(group)))
       yield clients_point
 
     yield Point("other") \
       .time(timestamp) \
       .tag("hostname", self.host) \
-      .field("status", summary['status'] == 'enabled') \
-      .field("gravity_last_update", summary['gravity_last_updated']['absolute'])
+      .field("gravity_last_update", summary['gravity']['last_update'])
 
-    for key, group_df in df.groupby('query_type'):
+    for key in summary['queries']['types']:
       yield Point("query_types") \
         .time(timestamp) \
         .tag("hostname", self.host) \
         .tag("query_type", key) \
-        .field("queries", len(group_df))
+        .field("queries", sum(1 for x in queries if x['type'] == key))
 
-    for key, group_df in df.groupby('destination'):
+    destinations = {}
+    for query in queries:
+      if query['upstream']:
+        name = query['upstream'].split('#')[0]
+        group = clients.get(name, [])
+        group.append(query)
+        clients[name] = group
+    for name, group in destinations.items():
       yield Point("forward_destinations") \
         .time(timestamp) \
         .tag("hostname", self.host) \
-        .tag("destination", key.split('|')[0]) \
-        .field("queries", len(group_df))
+        .tag("destination", name) \
+        .field("queries", len(group))
 
   def get_query_logs_for_influxdb(self, query_date: datetime, sample_period: int):
     end_time = query_date.timestamp()
     start_time = end_time - sample_period + 1
 
-    for data in self.request_all_queries(start_time, end_time):
-      timestamp, query_type, domain, client, status, destination, reply_type, reply_time, dnssec = data
+    for query in self.request_all_queries(start_time, end_time):
       p = Point("logs") \
-        .time(datetime.fromtimestamp(timestamp)) \
+        .time(datetime.fromtimestamp(query['time'])) \
         .tag("hostname", self.host) \
-        .tag("query_type", query_type) \
-        .field("domain", domain) \
-        .tag("client", client) \
-        .tag("status", QueryStati(status).name) \
-        .tag("reply_type", ReplyTypes(reply_type).name) \
-        .field("reply_time", reply_time) \
-        .tag("dnssec", DnssecStati(dnssec).name)
-      if destination:
-        p.tag("destination", destination)
+        .tag("query_type", query['type']) \
+        .field("domain", query['domain']) \
+        .tag("client", query['client']['name'] or query['client']['ip']) \
+        .tag("status", query['status'][0] + query['status'][1:].lower()) \
+        .tag("reply_type", query['reply']['type']) \
+        .field("reply_time", query['reply']['time']) \
+        .tag("dnssec", query['dnssec'][0] + query['dnssec'][1:].lower())
+      if query['upstream']:
+        p.tag("destination", query['upstream'].split('#')[0])
       yield p
 
 if __name__ == "__main__":
   import argparse
   parser = argparse.ArgumentParser(description='Export Pi-Hole statistics')
   parser.add_argument('--host', required=True, type=str, help='Pi-Hole host')
-  parser.add_argument('--token', '-t', required=True, type=str, help='Pi-Hole API token')
+  parser.add_argument('--password', '-t', required=True, type=str, help='Pi-Hole API password')
   args = parser.parse_args()
-  pihole = PiHole(host=args.host, token=args.token)
+  pihole = PiHole(host=args.host, password=args.password)
 
   points = list(pihole.get_queries_for_influxdb(datetime.now(), 600))
   for p in points:
