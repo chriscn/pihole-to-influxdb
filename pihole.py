@@ -123,9 +123,9 @@ class PiHole:
       .field("domain_count", summary['gravity']['domains_being_blocked']) \
       .field("unique_domains", len(set(x['domain'] for x in queries))) \
       .field("forwarded", sum(1 for x in queries if x['status'].startswith("FORWARDED"))) \
-      .field("cached", sum(1 for x in queries if x['status'].startswith("CACHED")))
+      .field("cached", sum(1 for x in queries if x['status'].startswith("CACHE")))
     
-    blocked_count = sum(1 for x in queries if x['status'].startswith("BLOCKED") or x['status'].startswith("BLACKLIST"))
+    blocked_count = sum(1 for x in queries if x['status'].startswith("GRAVITY"))
     queries_point = Point("queries") \
       .time(timestamp) \
       .tag("hostname", self.host) \
@@ -141,7 +141,7 @@ class PiHole:
       group.append(query)
       clients[name] = group
     for name, group in clients.items():
-      blocked_count = sum(1 for x in group if x['status'].startswith("BLOCKED") or x['status'].startswith("BLACKLIST"))
+      blocked_count = sum(1 for x in group if x['status'].startswith("GRAVITY"))
       clients_point = Point("clients") \
         .time(timestamp) \
         .tag("hostname", self.host) \
@@ -167,9 +167,9 @@ class PiHole:
     for query in queries:
       if query['upstream']:
         name = query['upstream'].split('#')[0]
-        group = clients.get(name, [])
+        group = destinations.get(name, [])
         group.append(query)
-        clients[name] = group
+        destinations[name] = group
     for name, group in destinations.items():
       yield Point("forward_destinations") \
         .time(timestamp) \
